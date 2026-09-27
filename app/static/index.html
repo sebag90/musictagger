@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resonance — Minimalist Music Library & Tag Manager</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#0d9488",
+            "primary-hover": "#0f766e",
+            "primary-light": "#14b8a6",
+            "primary-container": "#ccfbf1",
+            "on-primary-container": "#0f766e",
+            secondary: "#0f766e",
+            background: "#f8fafc",
+            surface: "#ffffff",
+            "surface-container": "#f1f5f9",
+            "surface-variant": "#e2e8f0",
+            "outline-variant": "#cbd5e1",
+            outline: "#94a3b8",
+            "on-surface": "#0f172a",
+            "on-surface-variant": "#475569",
+            "on-surface-muted": "#64748b",
+            danger: "#e11d48",
+            "danger-hover": "#be123c",
+            "danger-container": "#ffe4e6",
+          },
+          fontFamily: {
+            sans: ["'Hanken Grotesk'", "sans-serif"],
+            mono: ["'JetBrains Mono'", "monospace"],
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+            lg: "0.375rem",
+            xl: "0.5rem",
+            "2xl": "0.75rem",
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="bg-background font-sans text-on-surface antialiased selection:bg-teal-100 selection:text-teal-900 overflow-x-hidden min-h-screen">
+
+  <!-- ========================================== -->
+  <!-- AUTH LOGIN OVERLAY                         -->
+  <!-- ========================================== -->
+  <div id="authScreen" class="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-8 flex flex-col gap-6 animate-float-subtle">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-primary shadow-xs">
+          <span class="material-symbols-outlined text-[24px]">graphic_eq</span>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-slate-900">Resonance Sound Studio</h1>
+          <p class="text-xs text-on-surface-muted font-mono">AUTHENTICATE STUDIO WORKSTATION</p>
+        </div>
+      </div>
+
+      <div id="loginError" class="hidden p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600 font-mono">
+        Invalid credentials. Please verify username and password.
+      </div>
+
+      <form id="loginForm" class="flex flex-col gap-4">
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-mono font-medium text-on-surface-muted uppercase">Username</label>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[18px]">person</span>
+            <input id="loginUsername" type="text" required autofocus
+              class="w-full h-10 pl-9 pr-3 rounded-lg bg-slate-50 border border-slate-200 text-sm font-sans text-slate-900 focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all"
+              placeholder="e.g. admin" />
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-mono font-medium text-on-surface-muted uppercase">Password</label>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[18px]">lock</span>
+            <input id="loginPassword" type="password" required
+              class="w-full h-10 pl-9 pr-3 rounded-lg bg-slate-50 border border-slate-200 text-sm font-sans text-slate-900 focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all"
+              placeholder="••••••••" />
+          </div>
+        </div>
+
+        <button type="submit"
+          class="mt-2 w-full h-10 rounded-lg bg-primary hover:bg-primary-hover text-white text-sm font-semibold tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all">
+          <span class="material-symbols-outlined text-[18px]">key</span>
+          <span>Unlock Workstation</span>
+        </button>
+      </form>
+
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-on-surface-muted font-mono">
+        <span>HTPASSWD SECURED</span>
+        <span>BCRYPT PROTECTED</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- FLOATING LEFT DOCK (NAVIGATION RAIL)      -->
+  <!-- ========================================== -->
+  <aside class="fixed left-4 top-4 bottom-4 w-14 z-50 flex flex-col items-center justify-between py-3 rounded-2xl bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+    <div class="flex flex-col items-center gap-3">
+      <!-- App Brand Logo Icon -->
+      <div class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200/70 flex items-center justify-center shadow-xs">
+        <span class="material-symbols-outlined text-primary text-[22px]">graphic_eq</span>
+      </div>
+
+      <div class="w-6 h-[1px] bg-slate-200 my-1"></div>
+
+      <!-- Main Navigation Icons -->
+      <nav class="flex flex-col items-center gap-1.5" id="navRail">
+        <button id="navExplorer" class="group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all bg-primary text-white shadow-sm shadow-teal-600/20" title="Directory Explorer">
+          <span class="material-symbols-outlined text-[20px]">folder_open</span>
+        </button>
+        <button id="navTagEditor" class="group relative flex items-center justify-center w-10 h-10 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all" title="Metadata Tag Editor">
+          <span class="material-symbols-outlined text-[20px]">label</span>
+        </button>
+        <button id="navUploads" class="group relative flex items-center justify-center w-10 h-10 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all" title="Uploads & Queue">
+          <span class="material-symbols-outlined text-[20px]">cloud_upload</span>
+          <span id="uploadBadge" class="hidden absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white"></span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Bottom Dock Tools & Status -->
+    <div class="flex flex-col items-center gap-2">
+      <!-- Logout action -->
+      <button id="logoutBtn" class="flex items-center justify-center w-10 h-10 rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600 transition-all" title="Log Out">
+        <span class="material-symbols-outlined text-[20px]">logout</span>
+      </button>
+
+      <!-- System Engine Ready Status LED -->
+      <div class="w-2.5 h-2.5 rounded-full bg-primary ring-4 ring-teal-100" title="System Engine Ready • Lossless Audio Pipeline Active"></div>
+    </div>
+  </aside>
+
+  <!-- ========================================== -->
+  <!-- TOP HEADER / COMMAND BAR                  -->
+  <!-- ========================================== -->
+  <header class="fixed top-0 left-20 right-0 h-14 z-40 bg-white/85 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+    <div class="h-14 w-full px-6 flex items-center justify-between">
+      <!-- Left: Logo & Breadcrumb Route -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-900 tracking-tight text-base sm:inline-block">Resonance</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-teal-50 border border-teal-200/80 text-primary font-mono font-medium hidden sm:inline">STUDIO</span>
+        </div>
+        <span class="text-slate-300 font-mono hidden md:inline">/</span>
+        <div id="headerBreadcrumbs" class="hidden md:flex items-center gap-1.5 font-mono text-xs text-on-surface-muted">
+          <span class="hover:text-primary transition-colors cursor-pointer" onclick="navigateToFolder('')">Library</span>
+        </div>
+      </div>
+
+      <!-- Right: Search, Specs Badge & User Profile -->
+      <div class="flex items-center gap-3">
+        <!-- Live Quick Search -->
+        <div class="relative flex items-center">
+          <span class="material-symbols-outlined absolute left-2.5 text-slate-400 text-[18px]">search</span>
+          <input id="globalSearch" type="search" placeholder="Search catalog or tags (⌘K)..."
+            class="w-56 md:w-72 h-8 pl-8 pr-3 rounded-lg bg-slate-100/80 border border-slate-200 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:bg-white transition-all" />
+        </div>
+
+        <!-- Telemetry Badge -->
+        <div class="hidden sm:flex items-center gap-1.5 font-mono text-[11px] text-teal-800 bg-teal-50 border border-teal-200/80 px-2.5 py-1 rounded-lg font-medium">
+          <span class="material-symbols-outlined text-[14px] text-primary">album</span>
+          <span id="telemetryBadge">Lossless Engine • Active</span>
+        </div>
+
+        <!-- User Profile Pill -->
+        <div class="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono">
+          <div class="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[11px]">
+            <span id="userInitial">A</span>
+          </div>
+          <span id="usernameDisplay">admin</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- MAIN WORKSPACE VIEWPORT                    -->
+  <!-- ========================================== -->
+  <main class="pl-20 pt-16 pr-6 pb-20 min-h-screen">
+    
+    <!-- ================================================================ -->
+    <!-- VIEW 1: DIRECTORY EXPLORER & AUDIO BROWSER                      -->
+    <!-- ================================================================ -->
+    <section id="viewExplorer" class="flex flex-col gap-4">
+      
+      <!-- Explorer Command Bar -->
+      <div class="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+        <!-- Breadcrumbs Navigation -->
+        <div id="explorerBreadcrumbs" class="flex items-center flex-wrap gap-1.5 font-mono text-xs text-on-surface-muted">
+          <span class="material-symbols-outlined text-primary text-[18px]">dns</span>
+          <button onclick="navigateToFolder('')" class="hover:text-primary transition-colors">Library</button>
+        </div>
+
+        <!-- Right: Actions & Format Filters -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Format Filters -->
+          <div class="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5 gap-0.5 font-mono text-[11px]" id="formatFilterBar">
+            <button class="filter-pill px-2.5 py-1 rounded bg-white text-primary font-semibold shadow-xs transition-all" data-format="ALL">ALL</button>
+            <button class="filter-pill px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition-colors" data-format=".FLAC">.FLAC</button>
+            <button class="filter-pill px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition-colors" data-format=".MP3">.MP3</button>
+            <button class="filter-pill px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition-colors" data-format=".WAV">.WAV</button>
+            <button class="filter-pill px-2.5 py-1 rounded text-slate-600 hover:text-slate-900 transition-colors" data-format=".M4A">.M4A</button>
+          </div>
+
+          <div class="h-5 w-[1px] bg-slate-200 mx-1 hidden sm:block"></div>
+
+          <!-- Selection-dependent Action Buttons -->
+          <div id="selectionActions" class="hidden items-center gap-1.5">
+            <button id="batchTagBtn" class="px-3 py-1.5 rounded-lg bg-teal-50 border border-teal-200 text-teal-800 hover:bg-teal-100 text-xs font-mono font-medium flex items-center gap-1 transition-all">
+              <span class="material-symbols-outlined text-[16px]">label</span>
+              <span>Batch Tag (<span id="selectedCount">0</span>)</span>
+            </button>
+            <button id="batchMoveBtn" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-mono font-medium flex items-center gap-1 transition-all shadow-xs">
+              <span class="material-symbols-outlined text-[16px]">drive_file_move</span>
+              <span>Move</span>
+            </button>
+            <button id="batchDeleteBtn" class="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-xs font-mono font-medium flex items-center gap-1 transition-all">
+              <span class="material-symbols-outlined text-[16px]">delete</span>
+              <span>Delete</span>
+            </button>
+          </div>
+
+          <!-- Standard Actions -->
+          <button id="btnNewFolder" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-mono font-medium flex items-center gap-1.5 transition-all shadow-xs">
+            <span class="material-symbols-outlined text-[16px] text-primary">create_new_folder</span>
+            <span>New Folder</span>
+          </button>
+          <button id="btnUploadModal" class="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">cloud_upload</span>
+            <span>Upload Files</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Split Layout: Directory Tree (Left) + File Browser (Right) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- LEFT: Directory Tree Navigation (3 cols) -->
+        <div class="lg:col-span-3 flex flex-col gap-3">
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[18px]">account_tree</span>
+                <span class="font-mono text-xs font-bold uppercase tracking-wider text-slate-800">DIRECTORIES</span>
+              </div>
+              <button onclick="reloadTree()" class="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" title="Refresh Directory Tree">
+                <span class="material-symbols-outlined text-[16px]">sync</span>
+              </button>
+            </div>
+
+            <!-- Dynamic Directory Tree Container -->
+            <div id="directoryTreeContainer" class="flex flex-col gap-0.5 max-h-[600px] overflow-y-auto pr-1">
+              <div class="text-xs text-on-surface-muted font-mono p-2">Loading tree...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Files & Track Lane Table (9 cols) -->
+        <div class="lg:col-span-9 flex flex-col gap-3">
+          <!-- Folder Summary Banner -->
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-primary">
+                <span class="material-symbols-outlined text-[22px]">folder</span>
+              </div>
+              <div>
+                <h2 id="currentFolderTitle" class="text-base font-bold text-slate-900 tracking-tight">Music Library</h2>
+                <div class="flex items-center gap-2 text-xs text-on-surface-muted font-mono">
+                  <span id="currentFolderStats">0 Directories • 0 Files</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Parent Directory Navigation if in subfolder -->
+            <button id="btnParentFolder" class="hidden px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-xs flex items-center gap-1 transition-colors">
+              <span class="material-symbols-outlined text-[16px]">arrow_upward</span>
+              <span>Parent Directory</span>
+            </button>
+          </div>
+
+          <!-- File & Track Table Card -->
+          <div class="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200/80 bg-slate-50/70 font-mono text-[11px] text-on-surface-muted uppercase">
+                    <th class="w-10 p-3 text-center">
+                      <input id="selectAllCheckbox" type="checkbox" class="accent-teal-600 rounded cursor-pointer" />
+                    </th>
+                    <th class="w-12 p-3 text-center">Play</th>
+                    <th class="w-12 p-3 text-center">Cover</th>
+                    <th class="p-3">Title / File Name</th>
+                    <th class="p-3">Artist</th>
+                    <th class="p-3">Album</th>
+                    <th class="p-3">Format & Specs</th>
+                    <th class="p-3 text-right">Length</th>
+                    <th class="w-24 p-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="fileTableBody" class="divide-y divide-slate-100 text-xs">
+                  <!-- Rendered dynamically -->
+                  <tr>
+                    <td colspan="9" class="p-8 text-center text-on-surface-muted font-mono">
+                      Loading files...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Empty Folder State -->
+            <div id="emptyFolderState" class="hidden p-12 flex flex-col items-center justify-center gap-3 text-center">
+              <div class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-primary">
+                <span class="material-symbols-outlined text-[28px]">library_music</span>
+              </div>
+              <h3 class="text-sm font-bold text-slate-800">This directory is empty</h3>
+              <p class="text-xs text-on-surface-muted max-w-sm font-sans">Upload your music files or create subdirectories to organize your audio library.</p>
+              <button onclick="showUploadModal()" class="mt-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-mono font-semibold flex items-center gap-1.5 shadow-sm">
+                <span class="material-symbols-outlined text-[16px]">cloud_upload</span>
+                <span>Upload Audio Files</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- VIEW 2: DEEP METADATA TAG EDITOR & INSPECTOR                     -->
+    <!-- ================================================================ -->
+    <section id="viewTagEditor" class="hidden flex flex-col gap-4">
+      
+      <!-- Top Tag Editor Command Bar -->
+      <div class="w-full flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+        <div class="flex items-center gap-3 min-w-0">
+          <button onclick="switchView('explorer')" class="flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-xs" title="Back to Explorer">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+          </button>
+          
+          <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+            <span class="material-symbols-outlined text-primary text-[18px]">audio_file</span>
+            <div class="flex flex-col">
+              <div class="flex items-center gap-1 font-mono text-[10px] text-on-surface-muted">
+                <span id="editorTrackPosition">TRACK 01</span>
+                <span>•</span>
+                <span id="editorFormatTag" class="text-primary font-bold">FLAC / ID3</span>
+              </div>
+              <select id="editorTrackSwitcher" class="bg-transparent font-sans text-xs font-semibold text-slate-900 focus:outline-none cursor-pointer max-w-[240px] sm:max-w-[360px] truncate">
+                <!-- Populated dynamically with files in current directory -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions & Dirty State Indicator -->
+        <div class="flex items-center gap-2 self-end md:self-auto">
+          <div id="unsavedChangesBadge" class="hidden flex items-center gap-1.5 px-2.5 py-1 rounded bg-teal-50 border border-teal-200 font-mono text-[11px] text-teal-800 font-semibold">
+            <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+            <span id="unsavedCount">MODIFIED</span>
+          </div>
+          <button id="btnRevertTags" type="button" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-mono text-xs transition-all flex items-center gap-1 shadow-xs">
+            <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+            <span>Revert</span>
+          </button>
+          <button id="btnSaveTags" type="button" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-mono text-xs font-semibold tracking-tight transition-all shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px]">save</span>
+            <span>Save Metadata</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main 2-Column Workstation Grid -->
+      <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        
+        <!-- LEFT COLUMN: Artwork, Live Player, Specs (5 cols) -->
+        <div class="xl:col-span-5 flex flex-col gap-4">
+          
+          <!-- Artwork Card -->
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-primary text-[18px]">photo_library</span>
+                <span class="font-mono text-xs uppercase font-bold text-slate-900 tracking-wider">Embedded Artwork</span>
+              </div>
+              <span id="artworkSpecPill" class="font-mono text-[11px] text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">No Image</span>
+            </div>
+
+            <!-- Artwork Preview Container with Hover Controls -->
+            <div class="group relative aspect-square w-full rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shadow-inner">
+              <img id="editorArtworkImg" src="" alt="Album Cover Art" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102 hidden" />
+              <div id="artworkPlaceholder" class="flex flex-col items-center gap-2 text-slate-400">
+                <span class="material-symbols-outlined text-[48px]">album</span>
+                <span class="font-mono text-xs">No Cover Artwork</span>
+              </div>
+
+              <!-- Hover Action Overlay -->
+              <div class="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4 gap-2">
+                <div class="flex items-center justify-center gap-2">
+                  <label class="px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-800 font-mono text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition-colors">
+                    <span class="material-symbols-outlined text-[16px] text-primary">cloud_upload</span>
+                    <span>Replace Image</span>
+                    <input id="artworkFileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+                  </label>
+                  <button id="btnRemoveArtwork" type="button" class="p-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-mono text-xs transition-colors shadow-sm" title="Remove Artwork">
+                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                  </button>
+                </div>
+                <p class="font-mono text-[10px] text-center text-slate-300">Drop PNG/JPG here (Up to 15MB)</p>
+              </div>
+            </div>
+
+            <!-- Artwork Metrics -->
+            <div class="grid grid-cols-3 gap-1 text-center font-mono text-xs">
+              <div class="bg-slate-50 border border-slate-200/70 p-2 rounded-lg">
+                <span class="text-[10px] text-slate-400 block font-medium">FORMAT</span>
+                <span id="artworkFormat" class="font-semibold text-slate-800">--</span>
+              </div>
+              <div class="bg-slate-50 border border-slate-200/70 p-2 rounded-lg">
+                <span class="text-[10px] text-slate-400 block font-medium">DIMENSIONS</span>
+                <span id="artworkDimensions" class="font-semibold text-slate-800">--</span>
+              </div>
+              <div class="bg-slate-50 border border-slate-200/70 p-2 rounded-lg">
+                <span class="text-[10px] text-slate-400 block font-medium">FILE SIZE</span>
+                <span id="artworkSize" class="font-semibold text-slate-800">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Studio Audio Player & Live Waveform Scrubber -->
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <!-- Transport Controls -->
+              <div class="flex items-center gap-2 font-mono text-xs">
+                <button id="playerPlayPauseBtn" class="w-8 h-8 rounded-lg bg-primary hover:bg-primary-hover text-white flex items-center justify-center transition-colors shadow-sm">
+                  <span id="playerPlayIcon" class="material-symbols-outlined text-[20px]">play_arrow</span>
+                </button>
+                <div class="flex items-center gap-1 font-bold">
+                  <span id="playerCurrentTime" class="text-primary">00:00</span>
+                  <span class="text-slate-400">/</span>
+                  <span id="playerTotalTime" class="text-slate-500">00:00</span>
+                </div>
+              </div>
+
+              <!-- Engine Status indicator -->
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+                <span class="font-mono text-[10px] text-primary font-bold uppercase">Studio Pipeline Active</span>
+              </div>
+            </div>
+
+            <!-- Waveform Interactive Bar Scrubber -->
+            <div id="waveformContainer" class="relative w-full h-16 bg-slate-50 border border-slate-200 rounded-xl px-2 flex items-center gap-[2px] cursor-pointer overflow-hidden select-none" title="Click to seek">
+              <!-- Waveform bars rendered dynamically via JS -->
+              <div id="waveformBars" class="w-full h-full flex items-center gap-[2px]"></div>
+              <!-- Playhead Indicator Line -->
+              <div id="waveformPlayhead" class="absolute top-0 bottom-0 w-0.5 bg-primary pointer-events-none shadow-[0_0_8px_rgba(13,148,136,0.8)] left-0 transition-all"></div>
+            </div>
+
+            <!-- Player Audio Element (hidden) -->
+            <audio id="globalAudioPlayer" preload="none"></audio>
+
+            <!-- Bottom Transport Utilities (Volume / Mute) -->
+            <div class="flex items-center justify-between pt-1 font-mono text-[11px] text-slate-500">
+              <div class="flex items-center gap-2">
+                <button id="playerMuteBtn" class="hover:text-slate-900 transition-colors">
+                  <span id="playerVolumeIcon" class="material-symbols-outlined text-[16px]">volume_up</span>
+                </button>
+                <input id="playerVolumeSlider" type="range" min="0" max="1" step="0.05" value="0.8" class="w-20 accent-teal-600 cursor-pointer h-1" />
+              </div>
+              <span id="playerCodecBadge" class="text-slate-600 font-semibold">24-bit / 48.0 kHz</span>
+            </div>
+          </div>
+
+          <!-- Acoustic Specs Card -->
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-primary text-[18px]">memory</span>
+                <span class="font-mono text-xs uppercase font-bold text-slate-900 tracking-wider">Acoustic Specs</span>
+              </div>
+              <span id="specLosslessPill" class="px-2 py-0.5 rounded bg-teal-50 border border-teal-200 font-mono text-[10px] text-teal-800 font-semibold">LOSSLESS</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col">
+                <span class="font-mono text-[10px] text-slate-400 font-medium">BITRATE</span>
+                <span id="specBitrate" class="font-sans text-base font-bold text-slate-900">-- <span class="font-mono text-xs text-slate-500 font-normal">kbps</span></span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col">
+                <span class="font-mono text-[10px] text-slate-400 font-medium">SAMPLE RATE</span>
+                <span id="specSampleRate" class="font-sans text-base font-bold text-slate-900">-- <span class="font-mono text-xs text-slate-500 font-normal">kHz</span></span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col">
+                <span class="font-mono text-[10px] text-slate-400 font-medium">BIT DEPTH</span>
+                <span id="specBitDepth" class="font-sans text-base font-bold text-primary">-- <span class="font-mono text-xs text-slate-500 font-normal">bit</span></span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col">
+                <span class="font-mono text-[10px] text-slate-400 font-medium">CHANNELS</span>
+                <span id="specChannels" class="font-sans text-base font-bold text-slate-900">--</span>
+              </div>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl flex items-center justify-between text-slate-600 font-mono text-[11px]">
+              <span id="specCodec">CODEC: --</span>
+              <span id="specFileSize">SIZE: --</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Core Track Metadata Editor Form (7 cols) -->
+        <div class="xl:col-span-7 flex flex-col gap-4">
+          <form id="metadataForm" class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col gap-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[20px]">badge</span>
+                <h3 class="text-base font-bold text-slate-900 tracking-tight">Core Metadata Tags</h3>
+              </div>
+              <span class="font-mono text-[11px] text-slate-400 uppercase font-medium">ID3v2 &amp; Vorbis Standard</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Title (Full Width) -->
+              <div class="md:col-span-2 flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Track Title</label>
+                <input id="metaTitle" type="text"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans text-base font-semibold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs"
+                  placeholder="e.g. Subsurface Awakening" />
+              </div>
+
+              <!-- Artist -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Artist / Performer</label>
+                <input id="metaArtist" type="text"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs"
+                  placeholder="e.g. Aethel" />
+              </div>
+
+              <!-- Album Artist -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Album Artist</label>
+                <input id="metaAlbumArtist" type="text"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs"
+                  placeholder="e.g. Aethel" />
+              </div>
+
+              <!-- Album Title -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Album</label>
+                <input id="metaAlbum" type="text"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs"
+                  placeholder="e.g. Nebula Sessions Vol. 1" />
+              </div>
+
+              <!-- Release Year -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Release Year</label>
+                <input id="metaYear" type="text"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs"
+                  placeholder="e.g. 2025" />
+              </div>
+
+              <!-- Track Number / Total -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Track Number / Total</label>
+                <div class="flex items-center gap-2">
+                  <input id="metaTrackNumber" type="number" min="1" placeholder="4"
+                    class="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-sm text-center focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 shadow-xs" />
+                  <span class="text-slate-400 font-mono">/</span>
+                  <input id="metaTrackTotal" type="number" min="1" placeholder="12"
+                    class="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-500 font-mono text-sm text-center focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 shadow-xs" />
+                </div>
+              </div>
+
+              <!-- Disc Number / Total -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Disc Index / Total</label>
+                <div class="flex items-center gap-2">
+                  <input id="metaDiscNumber" type="number" min="1" placeholder="1"
+                    class="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-sm text-center focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 shadow-xs" />
+                  <span class="text-slate-400 font-mono">/</span>
+                  <input id="metaDiscTotal" type="number" min="1" placeholder="1"
+                    class="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-500 font-mono text-sm text-center focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 shadow-xs" />
+                </div>
+              </div>
+
+              <!-- Genre -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Genre</label>
+                <input id="metaGenre" type="text"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs"
+                  placeholder="e.g. Deep Minimal" />
+              </div>
+
+              <!-- Composer -->
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Composer</label>
+                <input id="metaComposer" type="text"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs"
+                  placeholder="e.g. Subsurface" />
+              </div>
+
+              <!-- Comment (Full Width) -->
+              <div class="md:col-span-2 flex flex-col gap-1">
+                <label class="font-mono text-[11px] text-slate-600 uppercase font-semibold">Comment / Notes</label>
+                <textarea id="metaComment" rows="3"
+                  class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all shadow-xs resize-none"
+                  placeholder="Additional master notes, studio metadata or credits..."></textarea>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- VIEW 3: AUDIO INGESTION & UPLOAD QUEUE                          -->
+    <!-- ================================================================ -->
+    <section id="viewUploads" class="hidden flex flex-col gap-4">
+      
+      <!-- Ingestion Header Card -->
+      <div class="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined text-[24px]">cloud_upload</span>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-slate-900 tracking-tight">Audio Ingestion &amp; Processing Queue</h2>
+            <p class="text-xs text-on-surface-muted font-mono">LOSSLESS MASTER INGESTION PIPELINE</p>
+          </div>
+        </div>
+
+        <!-- Target Destination Directory Picker -->
+        <div class="flex items-center gap-2">
+          <label class="font-mono text-xs text-slate-600 font-medium whitespace-nowrap">Target Folder:</label>
+          <select id="uploadTargetFolderSelect" class="h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500">
+            <option value="">Music Library (Root)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Drag & Drop Hero Zone -->
+      <div id="dropZone" class="w-full border-2 border-dashed border-slate-300 hover:border-teal-500 rounded-2xl bg-white/60 p-10 flex flex-col items-center justify-center gap-3 text-center transition-all cursor-pointer group shadow-xs">
+        <div class="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-200/70 flex items-center justify-center text-primary group-hover:scale-105 transition-transform shadow-xs">
+          <span class="material-symbols-outlined text-[32px]">upload_file</span>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Drag &amp; drop audio files here</h3>
+          <p class="text-xs text-on-surface-muted font-mono mt-1">Supports FLAC, MP3, WAV, M4A, OGG &amp; Lossless Master Stems</p>
+        </div>
+        <button type="button" onclick="document.getElementById('fileUploadInput').click()" class="mt-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-mono font-semibold flex items-center gap-1.5 shadow-sm transition-all">
+          <span class="material-symbols-outlined text-[16px]">folder_open</span>
+          <span>Browse Local Files</span>
+        </button>
+        <input id="fileUploadInput" type="file" multiple accept=".mp3,.flac,.wav,.wave,.m4a,.mp4,.aac,.ogg,.opus" class="hidden" />
+      </div>
+
+      <!-- Queue Status & Files Table -->
+      <div class="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[18px]">queue_music</span>
+            <span class="font-mono text-xs font-bold uppercase tracking-wider text-slate-900">FILES IN QUEUE</span>
+            <span id="queueCountBadge" class="ml-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono text-[10px]">0 files</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btnClearQueue" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-mono text-xs transition-colors shadow-xs">
+              Clear Queue
+            </button>
+            <button id="btnStartUpload" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-mono text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all">
+              <span class="material-symbols-outlined text-[16px]">upload</span>
+              <span>Start Ingestion</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Queue Item List -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200/80 bg-slate-50/70 font-mono text-[11px] text-on-surface-muted uppercase">
+                <th class="p-3">File Name</th>
+                <th class="p-3">Size</th>
+                <th class="p-3">Destination</th>
+                <th class="p-3">Status</th>
+                <th class="w-20 p-3 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="queueTableBody" class="divide-y divide-slate-100 text-xs">
+              <tr>
+                <td colspan="5" class="p-8 text-center text-on-surface-muted font-mono">
+                  Queue is empty. Drop files above to begin ingestion.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODALS & OVERLAYS                          -->
+  <!-- ========================================== -->
+
+  <!-- Modal: New Directory -->
+  <div id="modalNewFolder" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-sm bg-white rounded-2xl border border-slate-200 p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined text-[18px]">create_new_folder</span>
+        </div>
+        <h3 class="text-sm font-bold text-slate-900">Create New Directory</h3>
+      </div>
+      <form id="newFolderForm" class="flex flex-col gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Folder Name</label>
+          <input id="newFolderNameInput" type="text" required placeholder="e.g. Ambient Sessions 2025"
+            class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modalNewFolder')" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-mono transition-colors">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-mono font-semibold transition-colors">Create Folder</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Rename Item -->
+  <div id="modalRename" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-sm bg-white rounded-2xl border border-slate-200 p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined text-[18px]">drive_file_rename_outline</span>
+        </div>
+        <h3 class="text-sm font-bold text-slate-900">Rename Item</h3>
+      </div>
+      <form id="renameForm" class="flex flex-col gap-3">
+        <input type="hidden" id="renameSourcePath" />
+        <div class="flex flex-col gap-1">
+          <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">New Name</label>
+          <input id="renameNewNameInput" type="text" required
+            class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modalRename')" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-mono transition-colors">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-mono font-semibold transition-colors">Rename</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Move Items -->
+  <div id="modalMove" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined text-[18px]">drive_file_move</span>
+        </div>
+        <h3 class="text-sm font-bold text-slate-900">Move Item(s)</h3>
+      </div>
+      <form id="moveForm" class="flex flex-col gap-3">
+        <p class="text-xs text-on-surface-muted font-sans" id="moveSummaryText">Select destination folder:</p>
+        <div class="flex flex-col gap-1">
+          <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Destination Folder</label>
+          <select id="moveTargetSelect" class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 focus:bg-white focus:border-teal-500">
+            <!-- Populated dynamically with folders -->
+          </select>
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modalMove')" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-mono transition-colors">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-mono font-semibold transition-colors">Move Items</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Delete Confirmation -->
+  <div id="modalDelete" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-sm bg-white rounded-2xl border border-slate-200 p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center gap-2.5 text-rose-600">
+        <div class="w-8 h-8 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center">
+          <span class="material-symbols-outlined text-[20px]">warning</span>
+        </div>
+        <h3 class="text-sm font-bold text-slate-900">Confirm Deletion</h3>
+      </div>
+      <p id="deleteConfirmMessage" class="text-xs text-on-surface-muted font-sans leading-relaxed">
+        Are you sure you want to permanently delete these item(s)? This action cannot be undone.
+      </p>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" onclick="closeModal('modalDelete')" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-mono transition-colors">Cancel</button>
+        <button id="btnConfirmDelete" type="button" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono font-semibold transition-colors">Delete Permanently</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Batch Tag Editor -->
+  <div id="modalBatchTag" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="w-full max-w-lg bg-white rounded-2xl border border-slate-200 p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined text-[18px]">label_important</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Batch Metadata Tagging</h3>
+            <p class="text-xs text-on-surface-muted font-mono" id="batchTagCountText">Editing 0 tracks</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalBatchTag')" class="text-slate-400 hover:text-slate-700">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form id="batchTagForm" class="flex flex-col gap-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Artist</label>
+            <input id="batchArtist" type="text" placeholder="Leave empty to keep existing"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Album Artist</label>
+            <input id="batchAlbumArtist" type="text" placeholder="Leave empty to keep existing"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Album Title</label>
+            <input id="batchAlbum" type="text" placeholder="Leave empty to keep existing"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Year</label>
+            <input id="batchYear" type="text" placeholder="Leave empty to keep existing"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Genre</label>
+            <input id="batchGenre" type="text" placeholder="Leave empty to keep existing"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-mono text-slate-600 uppercase font-semibold">Composer</label>
+            <input id="batchComposer" type="text" placeholder="Leave empty to keep existing"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-teal-500" />
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalBatchTag')" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-mono transition-colors">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-mono font-semibold transition-colors">Apply to Selected</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Stack -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-[99] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Scripts -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
