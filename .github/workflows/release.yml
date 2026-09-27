@@ -1,0 +1,40 @@
+name: release
+on: workflow_dispatch
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          push: true
+          tags: |
+            ghcr.io/sebag90/music-tagger:latest
+            ghcr.io/sebag90/music-tagger:${{ github.sha }}
+
+  cleanup:
+    name: Cleanup Old Container Versions
+    needs: container
+    runs-on: ubuntu-latest
+    concurrency:
+      group: cleanup-images
+    permissions:
+      packages: write
+    steps:
+      - name: Cleanup Old GHCR Images
+        uses: step-security/ghcr-cleanup-action@v1
+        with:
+          packages: 'music-tagger'
+          keep-n-tagged: 3
+          token: ${{ secrets.GITHUB_TOKEN }}
