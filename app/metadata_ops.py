@@ -38,11 +38,28 @@ def format_size(bytes_num: int) -> str:
     return f"{bytes_num:.1f} TB"
 
 
+def sniff_image_mime(raw_bytes: bytes) -> str:
+    """Detects MIME type from image bytes header or Pillow."""
+    if not raw_bytes:
+        return "image/jpeg"
+    if raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if raw_bytes.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    if raw_bytes.startswith(b"RIFF") and b"WEBP" in raw_bytes[:16]:
+        return "image/webp"
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as img:
+            return Image.MIME.get(img.format, "image/jpeg")
+    except Exception:
+        return "image/jpeg"
+
+
 def get_image_info(img_bytes: bytes) -> Dict[str, Any]:
     """Inspects image dimensions, format and mime type using Pillow."""
     try:
         with Image.open(io.BytesIO(img_bytes)) as img:
-            mime = Image.MIME.get(img.format, "image/jpeg")
+            mime = Image.MIME.get(img.format, sniff_image_mime(img_bytes))
             return {
                 "width": img.width,
                 "height": img.height,
@@ -56,7 +73,7 @@ def get_image_info(img_bytes: bytes) -> Dict[str, Any]:
             "width": 0,
             "height": 0,
             "format": "UNKNOWN",
-            "mime": "image/jpeg",
+            "mime": sniff_image_mime(img_bytes),
             "size_bytes": len(img_bytes),
             "size_str": format_size(len(img_bytes)),
         }
@@ -273,6 +290,21 @@ def get_audio_metadata(rel_path: str) -> Dict[str, Any]:
         # Fall back to base result if mutagen failed
         pass
 
+    # If no embedded artwork found, check if a folder cover image exists (e.g. cover.jpg)
+    if not result["has_cover"]:
+        folder = file_path.parent
+        for cand in ("cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "folder.jpeg", "front.jpg", "front.png"):
+            cand_path = folder / cand
+            if cand_path.exists() and cand_path.is_file():
+                try:
+                    cdata = cand_path.read_bytes()
+                    result["has_cover"] = True
+                    result["is_folder_cover"] = True
+                    result["artwork_info"] = get_image_info(cdata)
+                    break
+                except Exception:
+                    pass
+
     return result
 
 
@@ -418,32 +450,62 @@ def update_audio_metadata(rel_path: str, data: Dict[str, Any]) -> Dict[str, Any]
 
 
 def get_artwork_bytes(rel_path: str) -> Tuple[bytes, str]:
-    """Retrieves embedded artwork raw bytes and MIME type."""
+    """Retrieves embedded artwork raw bytes and MIME type, with folder cover fallback."""
     file_path = resolve_safe_path(rel_path)
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
     ext = file_path.suffix.lower()
-    audio = mutagen.File(str(file_path))
-    if not audio:
-        raise HTTPException(status_code=404, detail="Could not read audio file")
 
-    # FLAC
-    if isinstance(audio, FLAC) and audio.pictures:
-        pic = audio.pictures[0]
-        return pic.data, pic.mime
+    # Direct image file request
+    if ext in (".jpg", ".jpeg", ".png", ".webp"):
+        raw = file_path.read_bytes()
+        return raw, sniff_image_mime(raw)
 
-    # MP3 / WAV
-    if hasattr(audio, "tags") and audio.tags:
-        apics = audio.tags.getall("APIC")
-        if apics:
-            return apics[0].data, apics[0].mime
+    try:
+        audio = mutagen.File(str(file_path))
+    except Exception:
+        audio = None
 
-    # MP4
-    if isinstance(audio, MP4) and "covr" in audio:
-        covr = audio["covr"][0]
-        mime = "image/png" if getattr(covr, "imageformat", None) == MP4Cover.FORMAT_PNG else "image/jpeg"
-        return bytes(covr), mime
+    if audio:
+        # 1. MP4 / M4A
+        if isinstance(audio, MP4) and audio.tags and "covr" in audio.tags:
+            covr_list = audio.tags.get("covr", [])
+            if covr_list:
+                raw = bytes(covr_list[0])
+                c_fmt = getattr(covr_list[0], "imageformat", None)
+                mime = "image/png" if c_fmt == MP4Cover.FORMAT_PNG else sniff_image_mime(raw)
+                return raw, mime
+
+        # 2. FLAC
+        elif isinstance(audio, FLAC) and audio.pictures:
+            pic = audio.pictures[0]
+            return pic.data, pic.mime or sniff_image_mime(pic.data)
+
+        # 3. MP3 / WAV (ID3)
+        elif hasattr(audio, "tags") and audio.tags and hasattr(audio.tags, "getall"):
+            apics = audio.tags.getall("APIC")
+            if apics:
+                return apics[0].data, apics[0].mime or sniff_image_mime(apics[0].data)
+
+        # 4. Ogg Vorbis / Opus
+        elif isinstance(audio, (OggVorbis, OggOpus)) and audio.tags:
+            import base64
+            from mutagen.flac import Picture
+            for block in audio.tags.get("metadata_block_picture", []):
+                try:
+                    pic = Picture(base64.b64decode(block))
+                    return pic.data, pic.mime or sniff_image_mime(pic.data)
+                except Exception:
+                    pass
+
+    # 5. Fallback: Folder Cover Image (cover.jpg, folder.jpg, etc.)
+    folder = file_path.parent
+    for cand in ("cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "folder.jpeg", "front.jpg", "front.png"):
+        cand_path = folder / cand
+        if cand_path.exists() and cand_path.is_file():
+            raw = cand_path.read_bytes()
+            return raw, sniff_image_mime(raw)
 
     raise HTTPException(status_code=404, detail="No embedded artwork found")
 

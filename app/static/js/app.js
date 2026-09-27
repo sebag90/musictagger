@@ -239,6 +239,25 @@ function initEvents() {
   dom.artworkFileInput.addEventListener("change", handleArtworkUpload);
   dom.btnRemoveArtwork.addEventListener("click", handleRemoveArtwork);
 
+  // Artwork Drag and Drop onto container
+  const artworkCard = dom.editorArtworkImg.parentElement;
+  if (artworkCard) {
+    artworkCard.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      artworkCard.classList.add("ring-2", "ring-teal-500");
+    });
+    artworkCard.addEventListener("dragleave", () => {
+      artworkCard.classList.remove("ring-2", "ring-teal-500");
+    });
+    artworkCard.addEventListener("drop", (e) => {
+      e.preventDefault();
+      artworkCard.classList.remove("ring-2", "ring-teal-500");
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        uploadArtworkFile(e.dataTransfer.files[0]);
+      }
+    });
+  }
+
   // Audio Player Events
   dom.playerPlayPauseBtn.addEventListener("click", toggleAudioPlayback);
   dom.globalAudioPlayer.addEventListener("timeupdate", updatePlayerProgress);
@@ -662,7 +681,7 @@ function renderFileList() {
       <td class="p-3 text-center">
         <div class="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border border-slate-200/80 flex items-center justify-center shadow-2xs">
           ${file.has_cover 
-            ? `<img src="/api/audio/artwork?path=${encodeURIComponent(file.path)}" class="w-full h-full object-cover" loading="lazy" />`
+            ? `<img src="/api/audio/artwork?path=${encodeURIComponent(file.path)}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" loading="lazy" /><span class="material-symbols-outlined text-[16px] text-slate-400" style="display:none">album</span>`
             : `<span class="material-symbols-outlined text-[16px] text-slate-400">album</span>`
           }
         </div>
@@ -794,10 +813,17 @@ function populateEditorTrackSwitcher(selectedPath) {
 
 function renderArtworkPreview(data) {
   if (data.has_cover) {
+    dom.editorArtworkImg.onload = () => {
+      dom.editorArtworkImg.classList.remove("hidden");
+      dom.artworkPlaceholder.classList.add("hidden");
+    };
+    dom.editorArtworkImg.onerror = () => {
+      dom.editorArtworkImg.classList.add("hidden");
+      dom.artworkPlaceholder.classList.remove("hidden");
+      dom.artworkSpecPill.textContent = "IMAGE LOAD ERROR";
+    };
     dom.editorArtworkImg.src = `/api/audio/artwork?path=${encodeURIComponent(data.path)}&t=${Date.now()}`;
-    dom.editorArtworkImg.classList.remove("hidden");
-    dom.artworkPlaceholder.classList.add("hidden");
-    dom.artworkSpecPill.textContent = "EMBEDDED";
+    dom.artworkSpecPill.textContent = data.is_folder_cover ? "FOLDER COVER" : "EMBEDDED";
 
     if (data.artwork_info) {
       dom.artworkFormat.textContent = data.artwork_info.format;
@@ -929,8 +955,7 @@ function handleRevertTags() {
   showToast("Reverted modifications", "info");
 }
 
-async function handleArtworkUpload(e) {
-  const file = e.target.files[0];
+async function uploadArtworkFile(file) {
   if (!file || !state.editorTrackPath) return;
 
   const formData = new FormData();
@@ -944,10 +969,16 @@ async function handleArtworkUpload(e) {
     });
     if (!res.ok) throw new Error("Artwork upload failed");
     showToast("Cover art embedded successfully", "success");
-    // Reload metadata
     openTagEditor(state.editorTrackPath);
   } catch (err) {
     showToast("Error uploading cover art: " + err.message, "error");
+  }
+}
+
+async function handleArtworkUpload(e) {
+  const file = e.target.files[0];
+  if (file) {
+    uploadArtworkFile(file);
   }
 }
 

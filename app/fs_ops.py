@@ -68,34 +68,20 @@ def get_quick_audio_summary(file_path: Path) -> Dict[str, Any]:
                 summary["bitrate"] = getattr(audio.info, "bitrate", 0)
                 summary["sample_rate"] = getattr(audio.info, "sample_rate", 0)
 
-            # Check tags
+            # Check tags by format
             tags = audio.tags
             if tags is not None:
-                # MP3 / ID3
-                if hasattr(tags, "getall"):
-                    # Title
-                    for key in ("TIT2", "title"):
-                        if key in tags:
-                            summary["title"] = str(tags[key].text[0] if hasattr(tags[key], "text") else tags[key][0])
-                            break
-                    # Artist
-                    for key in ("TPE1", "artist"):
-                        if key in tags:
-                            summary["artist"] = str(tags[key].text[0] if hasattr(tags[key], "text") else tags[key][0])
-                            break
-                    # Album
-                    for key in ("TALB", "album"):
-                        if key in tags:
-                            summary["album"] = str(tags[key].text[0] if hasattr(tags[key], "text") else tags[key][0])
-                            break
-                    # Track number
-                    if "TRCK" in tags:
-                        raw = str(tags["TRCK"].text[0] if hasattr(tags["TRCK"], "text") else tags["TRCK"][0])
-                        summary["track_number"] = raw.split("/")[0].strip()
-                    # Cover
-                    summary["has_cover"] = len(tags.getall("APIC")) > 0
+                # 1. MP4 / M4A
+                if hasattr(tags, "get") and ("\xa9nam" in tags or "covr" in tags):
+                    summary["title"] = str(tags.get("\xa9nam", [summary["title"]])[0])
+                    summary["artist"] = str(tags.get("\xa9ART", [""])[0])
+                    summary["album"] = str(tags.get("\xa9alb", [""])[0])
+                    trkn = tags.get("trkn")
+                    if trkn and isinstance(trkn[0], tuple):
+                        summary["track_number"] = str(trkn[0][0])
+                    summary["has_cover"] = "covr" in tags and len(tags["covr"]) > 0
 
-                # FLAC / OGG (dict-like with pictures attribute)
+                # 2. FLAC / OGG with pictures attribute
                 elif hasattr(audio, "pictures") and audio.pictures:
                     summary["has_cover"] = True
                     summary["title"] = str(tags.get("title", [summary["title"]])[0])
@@ -105,17 +91,26 @@ def get_quick_audio_summary(file_path: Path) -> Dict[str, Any]:
                     if track_no:
                         summary["track_number"] = str(track_no).split("/")[0].strip()
 
-                # MP4 / M4A
-                elif hasattr(tags, "get"):
-                    summary["title"] = str(tags.get("\xa9nam", [summary["title"]])[0])
-                    summary["artist"] = str(tags.get("\xa9ART", [""])[0])
-                    summary["album"] = str(tags.get("\xa9alb", [""])[0])
-                    trkn = tags.get("trkn")
-                    if trkn and isinstance(trkn[0], tuple):
-                        summary["track_number"] = str(trkn[0][0])
-                    summary["has_cover"] = "covr" in tags and len(tags["covr"]) > 0
+                # 3. MP3 / WAV / ID3 with getall
+                elif hasattr(tags, "getall"):
+                    for key in ("TIT2", "title"):
+                        if key in tags:
+                            summary["title"] = str(tags[key].text[0] if hasattr(tags[key], "text") else tags[key][0])
+                            break
+                    for key in ("TPE1", "artist"):
+                        if key in tags:
+                            summary["artist"] = str(tags[key].text[0] if hasattr(tags[key], "text") else tags[key][0])
+                            break
+                    for key in ("TALB", "album"):
+                        if key in tags:
+                            summary["album"] = str(tags[key].text[0] if hasattr(tags[key], "text") else tags[key][0])
+                            break
+                    if "TRCK" in tags:
+                        raw = str(tags["TRCK"].text[0] if hasattr(tags["TRCK"], "text") else tags["TRCK"][0])
+                        summary["track_number"] = raw.split("/")[0].strip()
+                    summary["has_cover"] = len(tags.getall("APIC")) > 0
 
-                # Generic dict
+                # 4. Generic dict
                 elif isinstance(tags, dict):
                     summary["title"] = str(tags.get("title", [summary["title"]])[0])
                     summary["artist"] = str(tags.get("artist", [""])[0])
@@ -123,6 +118,14 @@ def get_quick_audio_summary(file_path: Path) -> Dict[str, Any]:
                     trkn = tags.get("tracknumber")
                     if trkn:
                         summary["track_number"] = str(trkn[0]).split("/")[0].strip()
+
+        # If no embedded cover, check folder cover art
+        if not summary["has_cover"]:
+            folder = file_path.parent
+            for cand in ("cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "folder.jpeg", "front.jpg", "front.png"):
+                if (folder / cand).is_file():
+                    summary["has_cover"] = True
+                    break
     except Exception:
         pass
 

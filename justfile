@@ -61,7 +61,7 @@ demo:
     @echo "===> Stopping any existing demo container..."
     -podman rm -f {{CONTAINER_NAME}} 2>/dev/null || true
     @echo "===> Starting Music Tagger container..."
-    podman run -d --name {{CONTAINER_NAME}} \
+    podman run --name {{CONTAINER_NAME}} \
         -p {{PORT}}:8080 \
         -v $(pwd)/{{MUSIC_DIR}}:/music:z \
         -v $(pwd)/{{HTPASSWD_FILE}}:/auth/.htpasswd:z,ro \
