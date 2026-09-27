@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, UploadFile, File, Form, status
-from fastapi.responses import HTMLResponse, JSONResponse, Response as RawResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response as RawResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -285,6 +285,17 @@ async def api_stream_audio(request: Request, path: str, user: str = Depends(requ
 # --------------------------------------------------------------------------
 # Root Web Application
 # --------------------------------------------------------------------------
+
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
+async def favicon():
+    ico_file = STATIC_DIR / "favicon.ico"
+    if ico_file.exists():
+        return FileResponse(ico_file, media_type="image/x-icon")
+    svg_file = STATIC_DIR / "favicon.svg"
+    if svg_file.exists():
+        return FileResponse(svg_file, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Favicon not found")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
